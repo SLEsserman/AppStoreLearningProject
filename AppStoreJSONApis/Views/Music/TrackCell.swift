@@ -30,7 +30,12 @@ class TrackCell: UICollectionViewCell {
         ], customSpacing: 16)
         
         addSubview(stackView)
-        stackView.fillSuperview(padding: .init(top: 16, left: 16, bottom: 16, right: 16))
+        stackView.fillSuperview(
+            padding: .init(
+                top: 16,
+                left: 16,
+                bottom: 16,
+                right: 16))
         stackView.alignment = .center
     }
     

@@ -19,7 +19,7 @@ class MusicLoadingFooter: UICollectionReusableView {
         
         let label           = UILabel(text: "Loading More...", font: .systemFont(ofSize: 16))
         label.textAlignment = .center
-        let stackView       = VerticalStackView(arrangedSubviews: [aiv, label], spacing: 20)
+        let stackView       = VerticalStackView(arrangedSubviews: [aiv, label], spacing: 30)
         
         addSubview(stackView)
         stackView.centerInSuperview(size: .init(width: 200, height: 20))
