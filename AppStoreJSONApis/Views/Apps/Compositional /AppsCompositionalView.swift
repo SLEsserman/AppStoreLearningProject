@@ -91,13 +91,47 @@ class CompositionalController: UICollectionViewController {
     }
     
     
+    var socialApps = [SocialApp]()
+    var games: AppGroup?
+    
+    private func fetchApps() {
+        Service.shared.fetchSocialApps { (apps, err) in
+            
+            self.socialApps = apps ?? []
+            
+            Service.shared.fetchGames { (appGroup, err) in
+                self.games = appGroup
+                DispatchQueue.main.async {
+                    self.collectionView.reloadData()
+                }
+            }
+        }
+    }
+    
+    
     override func numberOfSections(in collectionView: UICollectionView) -> Int {
-        4
+        2
     }
     
     
     override func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return 8
+        if section == 0 {
+            return socialApps.count
+        }
+        return games?.feed.results.count ?? 0
+    }
+    
+    
+    override func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let appId: String
+        if indexPath.section == 0 {
+            appId                       = socialApps[indexPath.item].id
+        } else {
+            appId                       = games?.feed.results[indexPath.item].id ?? ""
+        }
+        
+        let appDetailController         = AppDetailController(appId: appId)
+        navigationController?.pushViewController(appDetailController, animated: true) 
     }
     
     
@@ -105,10 +139,20 @@ class CompositionalController: UICollectionViewController {
         
         switch indexPath.section {
         case 0:
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cellId", for: indexPath)
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: "cellId",
+                for: indexPath) as! AppsHeaderCell
+            let socialApp                   = self.socialApps[indexPath.item]
+            cell.titleLabel.text            = socialApp.tagline
+            cell.companyLabel.text          = socialApp.name
+            cell.imageView.sd_setImage(with: URL(string: socialApp.imageUrl))
             return cell
         default:
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "smallCellId", for: indexPath)
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "smallCellId", for: indexPath) as! AppRowCell
+            let app = games?.feed.results[indexPath.item]
+            cell.nameLabel.text = app?.name
+            cell.companyLabel.text = app?.artistName
+            cell.imageView.sd_setImage(with: URL(string: app?.artworkUrl100 ?? ""))
             return cell
         }
     }
@@ -152,6 +196,8 @@ class CompositionalController: UICollectionViewController {
         collectionView.backgroundColor                          = .systemBackground
         navigationItem.title                                    = "Apps"
         navigationController?.navigationBar.prefersLargeTitles  = true
+        
+        fetchApps()
         
     }
 }
