@@ -181,26 +181,63 @@ class CompositionalController: UICollectionViewController {
     enum AppSection {
         case topSocial
         case grossing
+        case games
     }
     
-    lazy var diffableDataSource: UICollectionViewDiffableDataSource<AppSection, SocialApp> = .init(collectionView: self.collectionView) { (collectionView, indexPath, socialApp) -> UICollectionViewCell? in
+    lazy var diffableDataSource: UICollectionViewDiffableDataSource<AppSection, AnyHashable> = .init(collectionView: self.collectionView) { (collectionView, indexPath, object) -> UICollectionViewCell? in
         
-        
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cellId", for: indexPath) as! AppsHeaderCell
-        cell.app = socialApp
-        return cell
+        if let object = object as? SocialApp {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cellId", for: indexPath) as! AppsHeaderCell
+            cell.app = object
+            return cell
+        } else if let object = object as? FeedResult {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "smallCellId", for: indexPath) as! AppRowCell
+            cell.app = object
+            return cell
+        }
+        return nil
     }
+    
     
     private func setupDiffableDataSource() {
 
         collectionView.dataSource = diffableDataSource
+        diffableDataSource.supplementaryViewProvider = .some({ (collectionView, kind, indexPath) -> UICollectionReusableView? in
+            let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: self.headerId, for: indexPath) as! CompositionalHeader
+            
+            let snapshot = self.diffableDataSource.snapshot()
+            let object = self.diffableDataSource.itemIdentifier(for: indexPath)
+            let section = snapshot.sectionIdentifier(containingItem: object!)!
+            
+            if section == .games {
+               header.label.text = "GAMES"
+            } else {
+                header.label.text = "TEST"
+            }
+            
+            return header
+        })
         
         Service.shared.fetchSocialApps { (socialApps, err) in
-            var snapshot = self.diffableDataSource.snapshot()
-            snapshot.appendSections([.topSocial])
-            snapshot.appendItems(socialApps ?? [], toSection: .topSocial)
             
-            self.diffableDataSource.apply(snapshot)
+            Service.shared.fetchTopGrossing { (appGroup, err) in
+                
+                Service.shared.fetchGames { (gamesGrup, err) in
+                    var snapshot = self.diffableDataSource.snapshot()
+                    
+                    //top social
+                    snapshot.appendSections([.topSocial, .grossing, .games])
+                    snapshot.appendItems(socialApps ?? [], toSection: .topSocial)
+                    
+                    //top grossing
+                    let objects = appGroup?.feed.results ?? []
+                    snapshot.appendItems(objects, toSection: .grossing)
+                    
+                    snapshot.appendItems(gamesGrup?.feed.results ?? [], toSection: .games)
+                    
+                    self.diffableDataSource.apply(snapshot)
+                }
+            }
         }
     }
 }
