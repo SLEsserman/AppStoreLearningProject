@@ -61,7 +61,14 @@ class CompositionalController: UICollectionViewController {
         let header = collectionView.dequeueReusableSupplementaryView(
             ofKind: kind,
             withReuseIdentifier: headerId,
-            for: indexPath)
+            for: indexPath) as! CompositionalHeader
+        var title: String?
+        if indexPath.section == 1 {
+            title = games?.feed.title
+        } else {
+            title = freeApps?.feed.title
+        }
+        header.label.text = title
         return header
     }
     
@@ -93,45 +100,63 @@ class CompositionalController: UICollectionViewController {
     
     var socialApps = [SocialApp]()
     var games: AppGroup?
+    var topGrossingApps: AppGroup?
+    var freeApps: AppGroup?
     
     private func fetchApps() {
         Service.shared.fetchSocialApps { (apps, err) in
-            
             self.socialApps = apps ?? []
-            
             Service.shared.fetchGames { (appGroup, err) in
                 self.games = appGroup
-                DispatchQueue.main.async {
-                    self.collectionView.reloadData()
+                Service.shared.fetchTopGrossing { (appGroup, err) in
+                    self.topGrossingApps = appGroup
+                    Service.shared.fetchAppGroup(urlString: "https://rss.itunes.apple.com/api/v1/us/ios-apps/top-free/all/25/explicit.json") { (appGroup, err) in
+                        self.freeApps = appGroup
+                        DispatchQueue.main.async {
+                            self.collectionView.reloadData()
+                        }
+                    }
                 }
             }
         }
+        
+        // fire all fetches at once
+        fetchAppsDispatchGroup()
     }
     
     
     override func numberOfSections(in collectionView: UICollectionView) -> Int {
-        2
+        4
     }
     
     
     override func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         if section == 0 {
             return socialApps.count
+        } else if section == 1 {
+            return games?.feed.results.count ?? 0
+        } else if section == 2 {
+            return topGrossingApps?.feed.results.count ?? 0
+        } else {
+            return freeApps?.feed.results.count ?? 0
         }
-        return games?.feed.results.count ?? 0
+        
     }
     
     
     override func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let appId: String
         if indexPath.section == 0 {
-            appId                       = socialApps[indexPath.item].id
+            appId = socialApps[indexPath.item].id
+        } else if indexPath.section == 1 {
+            appId = games?.feed.results[indexPath.item].id ?? ""
+        } else if indexPath.section == 2 {
+            appId = topGrossingApps?.feed.results[indexPath.item].id ?? ""
         } else {
-            appId                       = games?.feed.results[indexPath.item].id ?? ""
+            appId = freeApps?.feed.results[indexPath.item].id ?? ""
         }
-        
-        let appDetailController         = AppDetailController(appId: appId)
-        navigationController?.pushViewController(appDetailController, animated: true) 
+        let appDetailController = AppDetailController(appId: appId)
+        navigationController?.pushViewController(appDetailController, animated: true)
     }
     
     
@@ -139,22 +164,23 @@ class CompositionalController: UICollectionViewController {
         
         switch indexPath.section {
         case 0:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: "cellId",
-                for: indexPath) as! AppsHeaderCell
-            let socialApp                   = self.socialApps[indexPath.item]
-            cell.titleLabel.text            = socialApp.tagline
-            cell.companyLabel.text          = socialApp.name
-            cell.imageView.sd_setImage(with: URL(string: socialApp.imageUrl))
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cellId", for: indexPath) as! AppsHeaderCell
+            cell.app = self.socialApps[indexPath.item]
             return cell
         default:
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "smallCellId", for: indexPath) as! AppRowCell
-            let app = games?.feed.results[indexPath.item]
-            cell.nameLabel.text = app?.name
-            cell.companyLabel.text = app?.artistName
-            cell.imageView.sd_setImage(with: URL(string: app?.artworkUrl100 ?? ""))
+            let cell =  collectionView.dequeueReusableCell(withReuseIdentifier: "smallCellId", for: indexPath) as! AppRowCell
+            var appGroup: AppGroup?
+            if indexPath.section == 1 {
+                appGroup = games
+            } else if indexPath.section == 2 {
+                appGroup = topGrossingApps
+            } else {
+                appGroup = freeApps
+            }
+            cell.app = appGroup?.feed.results[indexPath.item]
             return cell
         }
+
     }
     
     
@@ -199,6 +225,42 @@ class CompositionalController: UICollectionViewController {
         
         fetchApps()
         
+    }
+}
+
+
+extension CompositionalController {
+    func fetchAppsDispatchGroup() {
+        let dispatchGroup = DispatchGroup()
+        
+        dispatchGroup.enter()
+        Service.shared.fetchGames { (appGroup, err) in
+            self.games = appGroup
+            dispatchGroup.leave()
+        }
+        
+        dispatchGroup.enter()
+        Service.shared.fetchTopGrossing { (appGroup, err) in
+            self.topGrossingApps = appGroup
+            dispatchGroup.leave()
+        }
+        
+        dispatchGroup.enter()
+        Service.shared.fetchAppGroup(urlString: "https://rss.itunes.apple.com/api/v1/us/ios-apps/top-free/all/25/explicit.json") { (appGroup, err) in
+            self.freeApps = appGroup
+            dispatchGroup.leave()
+        }
+        
+        dispatchGroup.enter()
+        Service.shared.fetchSocialApps { (apps, err) in
+            dispatchGroup.leave()
+            self.socialApps = apps ?? []
+        }
+        
+        // completion
+        dispatchGroup.notify(queue: .main) {
+            self.collectionView.reloadData()
+        }
     }
 }
 
