@@ -190,12 +190,51 @@ class CompositionalController: UICollectionViewController {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cellId", for: indexPath) as! AppsHeaderCell
             cell.app = object
             return cell
+            
         } else if let object = object as? FeedResult {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "smallCellId", for: indexPath) as! AppRowCell
             cell.app = object
+            
+            cell.getButton.addTarget(self, action: #selector(self.handleGet), for: .primaryActionTriggered)
+            
             return cell
         }
         return nil
+    }
+    
+    
+    @objc func handleGet(button: UIView) {
+        
+        var superview = button.superview
+        
+        while superview != nil {
+            if let cell = superview as? UICollectionViewCell {
+                guard let indexPath = self.collectionView.indexPath(for: cell) else { return }
+                guard let objectIClickedOnto = diffableDataSource.itemIdentifier(for: indexPath) else { return }
+                
+                var snapshot = diffableDataSource.snapshot()
+                snapshot.deleteItems([objectIClickedOnto])
+                diffableDataSource.apply(snapshot)
+                print(objectIClickedOnto)
+            }
+            superview = superview?.superview
+        }
+    }
+    
+    
+    override func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        
+        let object = diffableDataSource.itemIdentifier(for: indexPath)
+        if let object = object as? SocialApp {
+            let appDetailController = AppDetailController(appId: object.id)
+            
+            navigationController?.pushViewController(appDetailController, animated: true)
+            
+        } else if let object = object as? FeedResult {
+            let appDetailController = AppDetailController(appId: object.id)
+            
+            navigationController?.pushViewController(appDetailController, animated: true)
+        }
     }
     
     
