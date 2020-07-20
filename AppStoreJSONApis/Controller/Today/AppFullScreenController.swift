@@ -21,7 +21,7 @@ class AppFullScreenController: UIViewController, UITableViewDataSource, UITableV
         
         print(scrollView.contentOffset.y)
         
-        let translationY = -90 - UIApplication.shared.statusBarFrame.height
+        let translationY = -90 - (view.window?.windowScene?.statusBarManager?.statusBarFrame.height ?? 0)
 
         
         let transform = scrollView.contentOffset.y > 100 ? CGAffineTransform(translationX: 0, y: translationY): .identity
